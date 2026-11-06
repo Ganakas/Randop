@@ -18,7 +18,7 @@
 
 :root {
   color-scheme: dark;
-  font-family: Manrope, "Segoe UI", sans-serif;
+  font-family: Manrope, "Segoe UI", "Nirmala UI", "Microsoft YaHei UI", "Yu Gothic UI", "Malgun Gothic", sans-serif;
   font-size: 14.5px;
   font-weight: 520;
   --card: #2a2826;
@@ -142,7 +142,7 @@ button {
 }
 
 .window-buttons {
-  margin-left: auto;
+  margin-inline-start: auto;
   display: flex;
   gap: 2px;
 }
@@ -182,7 +182,7 @@ button {
   padding: 0 14px 0 12px;
   border-radius: 999px;
   border: 1px solid var(--edge);
-  text-align: left;
+  text-align: start;
   font-weight: 600;
   transition:
     background 0.25s var(--ease),
@@ -229,7 +229,7 @@ button {
 }
 
 .led {
-  margin-left: auto;
+  margin-inline-start: auto;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -270,10 +270,15 @@ button {
   gap: 11px;
   padding: 7px 8px;
   border-radius: 10px;
-  text-align: left;
+  text-align: start;
   line-height: 1.25;
   font-weight: 550;
   transition: background 0.2s var(--ease);
+}
+
+.row > span:last-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .row:hover {
@@ -410,10 +415,8 @@ button {
   animation: rise 0.28s var(--ease);
 }
 
-.about-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
+.about-close,
+.lang-button {
   width: 34px;
   height: 34px;
   border-radius: 10px;
@@ -426,18 +429,95 @@ button {
     transform 0.2s var(--ease);
 }
 
-.about-close svg {
+.about-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.about-close svg,
+.lang-button svg {
   width: 18px;
   height: 18px;
 }
 
-.about-close:hover {
+.about-close:hover,
+.lang-button:hover {
   background: rgba(255, 255, 255, 0.07);
   color: white;
 }
 
-.about-close:active {
+.about-close:active,
+.lang-button:active {
   transform: scale(0.92);
+}
+
+.lang {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+}
+
+.lang-menu {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  width: 176px;
+  max-height: 228px;
+  overflow: auto;
+  padding: 4px;
+  border-radius: 12px;
+  background: rgba(28, 26, 24, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.lang-menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.lang-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 99px;
+}
+
+.lang-option {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  text-align: start;
+  font-size: 13px;
+  font-weight: 560;
+}
+
+.lang-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lang-option.on {
+  color: var(--accent);
+}
+
+[dir="rtl"] .knob {
+  left: auto;
+  right: 3px;
+}
+
+[dir="rtl"] .master.on .knob {
+  transform: translateX(-18px);
+}
+
+html[lang="zh"] .section,
+html[lang="ja"] .section,
+html[lang="ko"] .section,
+html[lang="ar"] .section,
+html[lang="hi"] .section,
+html[lang="bn"] .section,
+html[lang="ur"] .section {
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .about-die {
@@ -468,8 +548,10 @@ button {
 }
 
 .check-update {
-  height: 32px;
-  padding: 0 12px;
+  min-height: 32px;
+  max-width: 210px;
+  padding: 6px 12px;
+  line-height: 1.2;
   border-radius: 999px;
   color: var(--text);
   background: rgba(255, 255, 255, 0.05);
@@ -555,7 +637,7 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: left;
+  text-align: start;
 }
 
 .heart {

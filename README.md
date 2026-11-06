@@ -1,15 +1,9 @@
 # Randop
 
-Случайный файл из папки через меню проводника. Окно нужно только чтобы один раз включить меню и закрыть. В трее ничего не висит.
+Right-click an empty spot in a folder and pick a random item.
 
-На Windows 11 пункт меню виден по Shift и правой кнопке или через «Показать дополнительные параметры». На Windows 10 он виден сразу.
+On Windows 11 the items show up with Shift + right-click, or under Show more options. On Windows 10 they show up immediately. Nothing stays in the tray.
 
-## Сборка
+## Build
 
-Дважды щёлкните `build.bat`. Готовый файл появится как `Randop.exe` рядом со скриптом. Первая сборка компилирует зависимости и занимает несколько минут.
-
-## Обновление
-
-В окне сведений кнопка «Проверить обновление» смотрит последний релиз на GitHub. Если версия новее, появляется кнопка скачивания: программа скачивает `Randop.exe` из релиза, подменяет свой файл и открывается заново. Консоль при этом не появляется.
-
-Пока репозиторий закрыт, GitHub не отдаёт релизы без токена. Токен в программу не вшит. Проверка заработает, когда репозиторий или релизы станут публичными, а в релизе будет файл `Randop.exe`.
+Run `build.bat`. It writes `Randop.exe` next to itself. The first build compiles dependencies and takes a few minutes.

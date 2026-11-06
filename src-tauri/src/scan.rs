@@ -42,7 +42,7 @@ pub fn choose_many(folder: &Path, count: usize) -> Result<Vec<PathBuf>, String> 
 
 pub fn collect(root: &Path, config: &Config) -> Result<Vec<PathBuf>, String> {
     if !root.is_dir() {
-        return Err(format!("папка не найдена:\n{}", root.display()));
+        return Err(crate::i18n::folder_missing(&root.display().to_string()));
     }
     let mut items = Vec::new();
     walk(root, config, 0, &mut items)?;
@@ -64,7 +64,7 @@ fn remember(config: &mut Config, key: String, picked: &Path) {
 }
 
 fn empty_message() -> String {
-    "В этой папке нечего выбирать.".to_owned()
+    crate::i18n::empty()
 }
 
 pub fn pick(items: &[PathBuf], previous: Option<&Path>) -> Option<PathBuf> {
@@ -94,7 +94,7 @@ fn walk(dir: &Path, config: &Config, depth: usize, out: &mut Vec<PathBuf>) -> Re
     }
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
-        Err(err) if depth == 0 => return Err(format!("не открыть папку: {err}")),
+        Err(err) if depth == 0 => return Err(crate::i18n::open_folder(&err.to_string())),
         Err(_) => return Ok(()),
     };
 

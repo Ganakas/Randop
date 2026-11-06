@@ -45,13 +45,13 @@ pub fn install() -> Result<(), String> {
     let release = latest()?;
     let version = release.tag_name.trim().trim_start_matches(['v', 'V']);
     if !newer(version, env!("CARGO_PKG_VERSION")) {
-        return Err("Это уже последняя версия".to_string());
+        return Err(crate::i18n::already_latest());
     }
     let asset = release
         .assets
         .iter()
         .find(|asset| asset.name.eq_ignore_ascii_case(ASSET_NAME))
-        .ok_or_else(|| format!("в релизе нет файла {ASSET_NAME}"))?;
+        .ok_or_else(crate::i18n::no_asset)?;
     expect_download_url(&asset.browser_download_url)?;
     let bytes = http_get(&asset.browser_download_url, false)?;
     replace_and_restart(&bytes)
@@ -59,7 +59,7 @@ pub fn install() -> Result<(), String> {
 
 fn latest() -> Result<Release, String> {
     let bytes = http_get(RELEASES, true)?;
-    serde_json::from_slice(&bytes).map_err(|_| "GitHub ответил непонятно".to_string())
+    serde_json::from_slice(&bytes).map_err(|_| crate::i18n::weird_reply())
 }
 
 fn expect_download_url(url: &str) -> Result<(), String> {
@@ -67,7 +67,7 @@ fn expect_download_url(url: &str) -> Result<(), String> {
     if url.starts_with(&prefix) && !url.contains("..") {
         Ok(())
     } else {
-        Err("ссылка на файл обновления выглядит неверно".to_string())
+        Err(crate::i18n::bad_url())
     }
 }
 
@@ -97,7 +97,7 @@ fn numbers(version: &str) -> Vec<u64> {
 
 fn http_get(url: &str, json: bool) -> Result<Vec<u8>, String> {
     let (host, path) = split_https(url)?;
-    let offline = || "Не получилось связаться с GitHub".to_string();
+    let offline = crate::i18n::offline;
     unsafe {
         let agent = wide("Randop");
         let session = Internet(WinHttpOpen(
@@ -142,14 +142,14 @@ fn http_get(url: &str, json: bool) -> Result<Vec<u8>, String> {
         let status = status_code(request.0)?;
         let landed = current_url(request.0)?;
         if !url_allowed(&landed) {
-            return Err("Файл пришёл не с GitHub".to_string());
+            return Err(crate::i18n::not_github());
         }
         let body = read_body(request.0)?;
         if status == 404 {
-            return Err("Пока нет опубликованной версии".to_string());
+            return Err(crate::i18n::no_release());
         }
         if !(200..300).contains(&status) {
-            return Err("GitHub не отдал обновление".to_string());
+            return Err(crate::i18n::github_refused());
         }
         Ok(body)
     }
@@ -172,7 +172,7 @@ fn status_code(request: *mut c_void) -> Result<u32, String> {
             &mut size,
             &mut index,
         )
-        .map_err(|_| "GitHub ответил непонятно".to_string())?;
+        .map_err(|_| crate::i18n::weird_reply())?;
     }
     Ok(status)
 }
@@ -183,13 +183,13 @@ fn read_body(request: *mut c_void) -> Result<Vec<u8>, String> {
         let mut available = 0u32;
         unsafe {
             WinHttpQueryDataAvailable(request, &mut available)
-                .map_err(|_| "Скачивание прервалось".to_string())?;
+                .map_err(|_| crate::i18n::offline())?;
         }
         if available == 0 {
             break;
         }
         if body.len() + available as usize > MAX_BYTES {
-            return Err("Файл обновления слишком большой".to_string());
+            return Err(crate::i18n::too_big());
         }
         let mut chunk = vec![0u8; available as usize];
         let mut read = 0u32;
@@ -200,7 +200,7 @@ fn read_body(request: *mut c_void) -> Result<Vec<u8>, String> {
                 available,
                 &mut read,
             )
-            .map_err(|_| "Скачивание прервалось".to_string())?;
+            .map_err(|_| crate::i18n::offline())?;
         }
         chunk.truncate(read as usize);
         body.extend_from_slice(&chunk);
@@ -221,7 +221,7 @@ fn current_url(request: *mut c_void) -> Result<String, String> {
             Some(buf.as_mut_ptr() as *mut c_void),
             &mut size,
         )
-        .map_err(|_| "Не вижу адрес скачивания".to_string())?;
+        .map_err(|_| crate::i18n::bad_url())?;
     }
     let chars = (size as usize / 2).min(buf.len());
     let end = buf[..chars].iter().position(|unit| *unit == 0).unwrap_or(chars);
@@ -245,12 +245,12 @@ fn url_allowed(url: &str) -> bool {
 
 fn replace_and_restart(bytes: &[u8]) -> Result<(), String> {
     if bytes.len() < 100_000 || !bytes.starts_with(b"MZ") {
-        return Err("Скачанный файл не похож на программу".to_string());
+        return Err(crate::i18n::not_program());
     }
-    let current = std::env::current_exe().map_err(|_| "Не вижу свой файл".to_string())?;
+    let current = std::env::current_exe().map_err(|_| crate::i18n::no_self())?;
     let dir = current
         .parent()
-        .ok_or_else(|| "Не вижу папку программы".to_string())?;
+        .ok_or_else(crate::i18n::no_dir)?;
     let name = current
         .file_name()
         .and_then(|item| item.to_str())
@@ -260,24 +260,24 @@ fn replace_and_restart(bytes: &[u8]) -> Result<(), String> {
     let parked = dir.join(format!("{name}.bad"));
     let marker = dir.join(format!("{name}.updated"));
     std::fs::write(&incoming, bytes).map_err(|_| {
-        "Не могу записать обновление рядом с программой. Положите её в свою папку.".to_string()
+        crate::i18n::cant_write()
     })?;
     if previous.exists() && std::fs::remove_file(&previous).is_err() {
         let _ = std::fs::remove_file(&incoming);
-        return Err("Прежняя копия ещё занята. Закройте Randop и попробуйте снова.".to_string());
+        return Err(crate::i18n::old_busy());
     }
     if let Err(err) = std::fs::rename(&current, &previous) {
         let _ = std::fs::remove_file(&incoming);
-        return Err(format!("Не получилось заменить программу: {err}"));
+        return Err(crate::i18n::replace_failed(&err.to_string()));
     }
     if let Err(err) = std::fs::rename(&incoming, &current) {
         if std::fs::rename(&previous, &current).is_err() {
             return Err(
-                "Не получилось заменить программу. Рабочая копия осталась в файле .old".to_string(),
+                crate::i18n::replace_left_old(),
             );
         }
         let _ = std::fs::remove_file(&incoming);
-        return Err(format!("Не получилось заменить программу: {err}"));
+        return Err(crate::i18n::replace_failed(&err.to_string()));
     }
     match std::process::Command::new(&current).spawn() {
         Ok(_) => {
@@ -289,11 +289,10 @@ fn replace_and_restart(bytes: &[u8]) -> Result<(), String> {
             if std::fs::rename(&current, &parked).is_ok() && std::fs::rename(&previous, &current).is_ok()
             {
                 let _ = std::fs::remove_file(&parked);
-                Err(format!("Новая версия не запустилась: {err}"))
+                Err(crate::i18n::new_failed(&err.to_string()))
             } else {
                 Err(
-                    "Новая версия не запустилась. Если окно не открывается, переименуйте файл .old обратно."
-                        .to_string(),
+                    crate::i18n::new_failed_restore(),
                 )
             }
         }
@@ -322,12 +321,12 @@ pub fn cleanup_previous() {
 fn split_https(url: &str) -> Result<(String, String), String> {
     let rest = url
         .strip_prefix("https://")
-        .ok_or_else(|| "Ссылка обновления должна быть https".to_string())?;
+        .ok_or_else(crate::i18n::need_https)?;
     let (host, path) = rest
         .split_once('/')
-        .ok_or_else(|| "Ссылка обновления выглядит неверно".to_string())?;
+        .ok_or_else(crate::i18n::bad_url)?;
     if host.is_empty() || path.is_empty() || host.contains('@') {
-        return Err("Ссылка обновления выглядит неверно".to_string());
+        return Err(crate::i18n::bad_url());
     }
     Ok((host.to_string(), format!("/{path}")))
 }

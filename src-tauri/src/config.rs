@@ -15,6 +15,8 @@ pub struct Config {
     pub recursive: bool,
     #[serde(default)]
     pub last_pick: BTreeMap<String, String>,
+    #[serde(default)]
+    pub lang: Option<String>,
 }
 
 fn yes() -> bool {
@@ -29,6 +31,7 @@ impl Default for Config {
             menu_multi: false,
             recursive: false,
             last_pick: BTreeMap::new(),
+            lang: None,
         }
     }
 }
@@ -50,10 +53,10 @@ pub fn load() -> Config {
 pub fn save(config: &Config) -> Result<(), String> {
     let path = config_path();
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| format!("не сохранить настройки: {err}"))?;
+        std::fs::create_dir_all(parent).map_err(|err| crate::i18n::save_failed(&err.to_string()))?;
     }
     let text = serde_json::to_string_pretty(config).map_err(|err| err.to_string())?;
-    std::fs::write(path, text).map_err(|err| format!("не сохранить настройки: {err}"))
+    std::fs::write(path, text).map_err(|err| crate::i18n::save_failed(&err.to_string()))
 }
 
 pub fn norm_key(path: &Path) -> String {

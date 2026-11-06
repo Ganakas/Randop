@@ -18,7 +18,7 @@ pub fn open_url(url: &str) -> Result<(), String> {
         )
     };
     if (code.0 as isize) <= 32 {
-        Err("не получилось открыть ссылку".to_string())
+        Err(crate::i18n::open_link())
     } else {
         Ok(())
     }
@@ -38,10 +38,9 @@ pub fn open(path: &Path) -> Result<(), String> {
         )
     };
     if (code.0 as isize) <= 32 {
-        Err(format!(
-            "не получилось открыть «{}» (код {})",
-            file_label(path),
-            code.0 as isize
+        Err(crate::i18n::open_file(
+            &file_label(path),
+            &(code.0 as isize).to_string(),
         ))
     } else {
         Ok(())

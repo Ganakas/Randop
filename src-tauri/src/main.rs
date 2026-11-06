@@ -4,6 +4,7 @@
 compile_error!("Randop работает только на Windows");
 
 mod config;
+mod i18n;
 #[allow(dead_code)]
 mod icon_raster;
 mod launch;
@@ -26,6 +27,7 @@ struct Settings {
     open: bool,
     multi: bool,
     recursive: bool,
+    lang: String,
 }
 
 fn current_settings() -> Settings {
@@ -36,6 +38,12 @@ fn current_settings() -> Settings {
         open: config.menu_open,
         multi: config.menu_multi,
         recursive: config.recursive,
+        lang: config
+            .lang
+            .as_deref()
+            .and_then(i18n::known)
+            .unwrap_or_else(i18n::system)
+            .to_string(),
     }
 }
 
@@ -69,6 +77,18 @@ fn save_settings(state: Settings) -> Result<Settings, String> {
 }
 
 const GITHUB_URL: &str = "https://github.com/Ganakas/Randop";
+
+#[tauri::command]
+fn set_language(lang: String) -> Result<Settings, String> {
+    let code = i18n::known(&lang).ok_or_else(|| "Unknown language.".to_string())?;
+    let mut config = config::load();
+    config.lang = Some(code.to_string());
+    config::save(&config)?;
+    if registry::menu_state().present {
+        registry::apply(registry::MenuFlags::from_config(&config))?;
+    }
+    Ok(current_settings())
+}
 
 #[tauri::command]
 fn open_github() -> Result<(), String> {
@@ -105,14 +125,32 @@ fn main() {
     }
 }
 
+fn settle_language() {
+    let mut config = config::load();
+    if let Some(code) = config.lang.as_deref().and_then(i18n::known) {
+        if config.lang.as_deref() != Some(code) {
+            config.lang = Some(code.to_string());
+            let _ = config::save(&config);
+        }
+        return;
+    }
+    config.lang = Some(i18n::system().to_string());
+    let _ = config::save(&config);
+    if registry::menu_state().present {
+        let _ = registry::apply(registry::MenuFlags::from_config(&config));
+    }
+}
+
 fn run() -> Result<(), String> {
     update::cleanup_previous();
+    settle_language();
     let args: Vec<OsString> = std::env::args_os().skip(1).collect();
     if args.is_empty() {
         tauri::Builder::default()
             .invoke_handler(tauri::generate_handler![
                 settings,
                 save_settings,
+                set_language,
                 open_github,
                 check_update,
                 install_update
@@ -134,7 +172,7 @@ fn run() -> Result<(), String> {
             if path.is_dir() {
                 act(Action::Highlight, Some(path.as_os_str()))
             } else {
-                Err("не понял команду".to_owned())
+                Err(i18n::bad_command())
             }
         }
     }
@@ -171,13 +209,13 @@ fn resolve_folder(folder: Option<&OsStr>) -> Result<PathBuf, String> {
             if path.is_dir() {
                 return Ok(path);
             }
-            return Err(format!("папка не найдена:\n{}", path.display()));
+            return Err(i18n::folder_missing(&path.display().to_string()));
         }
     }
     let current = std::env::current_dir().map_err(|err| err.to_string())?;
     if current.is_dir() {
         Ok(current)
     } else {
-        Err("проводник не передал папку".to_owned())
+        Err(i18n::no_folder())
     }
 }

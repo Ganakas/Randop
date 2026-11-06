@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LANGUAGES, direction, fill, text } from "./i18n";
 
 const GITHUB = "github.com/Ganakas/Randop";
 
@@ -11,6 +12,7 @@ type Settings = {
   open: boolean;
   multi: boolean;
   recursive: boolean;
+  lang: string;
 };
 
 type UpdateOffer = {
@@ -31,6 +33,7 @@ export function App() {
   const [error, setError] = useState("");
   const [spin, setSpin] = useState(false);
   const [about, setAbout] = useState(false);
+  const [langs, setLangs] = useState(false);
   const [version, setVersion] = useState("0.1.0");
   const [update, setUpdate] = useState<UpdateState>({ kind: "idle" });
 
@@ -44,13 +47,21 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    const lang = settings?.lang ?? "en";
+    document.documentElement.lang = lang;
+    document.documentElement.dir = direction(lang);
+  }, [settings?.lang]);
+
+  useEffect(() => {
     if (!about) return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setAbout(false);
+      if (event.key !== "Escape") return;
+      if (langs) setLangs(false);
+      else setAbout(false);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [about]);
+  }, [about, langs]);
 
   async function commit(next: Settings) {
     setSettings(next);
@@ -88,10 +99,23 @@ export function App() {
     }
   }
 
+  async function chooseLanguage(lang: string) {
+    setLangs(false);
+    setError("");
+    try {
+      const saved = await invoke<Settings>("set_language", { lang });
+      setSettings(saved);
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+
   function patch(part: Partial<Settings>) {
     if (!settings) return;
     void commit({ ...settings, ...part });
   }
+
+  const copy = text(settings?.lang ?? "en");
 
   return (
     <div className="shell">
@@ -108,7 +132,7 @@ export function App() {
           <div className="window-buttons">
             <button
               className="glyph"
-              aria-label="Свернуть"
+              aria-label={copy.minimize}
               onClick={() => void getCurrentWindow().minimize()}
             >
               <Stroke>
@@ -117,7 +141,7 @@ export function App() {
             </button>
             <button
               className="glyph close"
-              aria-label="Закрыть"
+              aria-label={copy.close}
               onClick={() => void getCurrentWindow().close()}
             >
               <Stroke>
@@ -137,33 +161,33 @@ export function App() {
               <span className="knob-track" aria-hidden="true">
                 <span className="knob" />
               </span>
-              <span>{settings.enabled ? "Включено" : "Выключено"}</span>
+              <span>{settings.enabled ? copy.on : copy.off}</span>
               <span className="led" aria-hidden="true" />
             </button>
 
-            <p className="section">Пункты меню</p>
+            <p className="section">{copy.menu}</p>
             <div className="group glass">
               <Check
                 on={settings.pick}
-                label="Случайно"
+                label={copy.pick}
                 onToggle={() => patch({ pick: !settings.pick })}
               />
               <Check
                 on={settings.open}
-                label="Открыть случайный"
+                label={copy.open}
                 onToggle={() => patch({ open: !settings.open })}
               />
               <Check
                 on={settings.multi}
-                label="Выбрать несколько случайных"
+                label={copy.multi}
                 onToggle={() => patch({ multi: !settings.multi })}
               />
             </div>
 
-            <p className="section">Поведение</p>
+            <p className="section">{copy.behavior}</p>
             <Check
               on={settings.recursive}
-              label="Заглядывать в подпапки"
+              label={copy.recursive}
               onToggle={() => patch({ recursive: !settings.recursive })}
             />
           </>
@@ -172,7 +196,14 @@ export function App() {
         {error && <p className="error">{error}</p>}
 
         <div className="footer glass">
-          <button className="icon-button" aria-label="Сведения" onClick={() => setAbout(true)}>
+          <button
+            className="icon-button"
+            aria-label={copy.about}
+            onClick={() => {
+              setLangs(false);
+              setAbout(true);
+            }}
+          >
             <Stroke>
               <circle cx="12" cy="12" r="9" />
               <path d="M12 16v-4" />
@@ -181,7 +212,7 @@ export function App() {
           </button>
           <button
             className={spin ? "icon-button spin" : "icon-button"}
-            aria-label="Обновить меню"
+            aria-label={copy.refresh}
             onClick={() => {
               if (!settings) return;
               setSpin(true);
@@ -199,14 +230,56 @@ export function App() {
         </div>
 
         {about && (
-          <div className="about-layer" onMouseDown={() => setAbout(false)}>
+          <div
+            className="about-layer"
+            onMouseDown={() => {
+              setLangs(false);
+              setAbout(false);
+            }}
+          >
             <div
               className="about glass"
               role="dialog"
-              aria-label="О программе"
-              onMouseDown={(event) => event.stopPropagation()}
+              aria-label={copy.about}
+              onMouseDown={(event) => {
+                event.stopPropagation();
+                if (!(event.target as HTMLElement).closest(".lang")) setLangs(false);
+              }}
             >
-              <button className="about-close" aria-label="Закрыть" onClick={() => setAbout(false)}>
+              <div className="lang">
+                <button
+                  className="lang-button"
+                  aria-label={copy.language}
+                  aria-expanded={langs}
+                  onClick={() => setLangs((open) => !open)}
+                >
+                  <Stroke>
+                    <path d="m5 8 6 6" />
+                    <path d="m4 14 6-6 2-3" />
+                    <path d="M2 5h12" />
+                    <path d="M7 2h1" />
+                    <path d="m22 22-5-10-5 10" />
+                    <path d="M14 18h6" />
+                  </Stroke>
+                </button>
+                {langs && (
+                  <div className="lang-menu" role="listbox">
+                    {LANGUAGES.map((item) => (
+                      <button
+                        key={item.id}
+                        className={item.id === settings?.lang ? "lang-option on" : "lang-option"}
+                        role="option"
+                        aria-selected={item.id === settings?.lang}
+                        dir="auto"
+                        onClick={() => void chooseLanguage(item.id)}
+                      >
+                        {item.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button className="about-close" aria-label={copy.close} onClick={() => setAbout(false)}>
                 <Stroke>
                   <path d="M18 6 6 18" />
                   <path d="m6 6 12 12" />
@@ -222,15 +295,15 @@ export function App() {
                   onClick={() => void checkUpdate()}
                 >
                   {update.kind === "checking"
-                    ? "Проверка…"
+                    ? copy.checking
                     : update.kind === "downloading"
-                      ? "Скачивание…"
-                      : "Проверить обновление"}
+                      ? copy.downloading
+                      : copy.check}
                 </button>
                 {update.kind === "ready" && (
                   <button
                     className="download"
-                    aria-label={`Скачать версию ${update.version}`}
+                    aria-label={fill(copy.download, { version: update.version })}
                     onClick={() => void installUpdate()}
                   >
                     <Stroke>
@@ -241,9 +314,9 @@ export function App() {
                   </button>
                 )}
               </div>
-              {update.kind === "current" && <p className="update-note">Это последняя версия</p>}
+              {update.kind === "current" && <p className="update-note">{copy.latest}</p>}
               {update.kind === "ready" && (
-                <p className="update-note">Доступна версия {update.version}</p>
+                <p className="update-note">{fill(copy.available, { version: update.version })}</p>
               )}
               {update.kind === "note" && <p className="update-note">{update.text}</p>}
               <div className="about-rule" />

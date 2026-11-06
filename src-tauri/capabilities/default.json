@@ -10,6 +10,7 @@
     "core:window:allow-start-dragging",
     "allow-settings",
     "allow-save-settings",
+    "allow-set-language",
     "allow-open-github",
     "allow-check-update",
     "allow-install-update",

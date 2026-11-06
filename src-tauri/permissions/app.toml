@@ -9,6 +9,11 @@ description = "Сохранить настройки и меню проводн�
 commands.allow = ["save_settings"]
 
 [[permission]]
+identifier = "allow-set-language"
+description = "Сменить язык окна и меню проводника"
+commands.allow = ["set_language"]
+
+[[permission]]
 identifier = "allow-open-github"
 description = "Открыть страницу проекта"
 commands.allow = ["open_github"]

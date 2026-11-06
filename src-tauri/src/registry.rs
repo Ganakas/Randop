@@ -27,10 +27,10 @@ impl MenuFlags {
     }
 }
 
-const VERBS: [(&str, &str, &str); 3] = [
-    ("Randop1", "Случайно", "highlight"),
-    ("Randop2", "Открыть случайный", "open"),
-    ("Randop3", "Выбрать несколько случайных", "multi"),
+const VERBS: [(&str, &str); 3] = [
+    ("Randop1", "highlight"),
+    ("Randop2", "open"),
+    ("Randop3", "multi"),
 ];
 
 const ROOTS: [&str; 2] = [
@@ -79,8 +79,9 @@ pub fn apply(flags: MenuFlags) -> Result<(), String> {
                 continue;
             }
             let path = format!(r"{root}\{0}", verb.0);
-            write_verb(&path, verb.1, &command_quote(&exe, verb.2), &exe_text)
-                .map_err(|err| format!("не записать меню: {err}"))?;
+            let label = crate::i18n::verb(crate::i18n::active(), verb.1);
+            write_verb(&path, label, &command_quote(&exe, verb.1), &exe_text)
+                .map_err(|err| crate::i18n::write_menu(&err.to_string()))?;
         }
     }
     Ok(())
@@ -94,7 +95,7 @@ pub fn uninstall() -> Result<(), String> {
             match hkcu.delete_subkey_all(path) {
                 Ok(()) => {}
                 Err(err) if err.kind() == io::ErrorKind::NotFound => {}
-                Err(err) => return Err(format!("не убрать меню: {err}")),
+                Err(err) => return Err(crate::i18n::remove_menu(&err.to_string())),
             }
         }
     }

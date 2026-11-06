@@ -46,8 +46,8 @@ fn select_in_open_windows(files: &[std::path::PathBuf]) -> Result<bool, String> 
 
     let shell_windows: IShellWindows =
         unsafe { CoCreateInstance(&ShellWindows, None::<&windows::core::IUnknown>, CLSCTX_ALL) }
-            .map_err(|err| err.to_string())?;
-    let count = unsafe { shell_windows.Count() }.map_err(|err| err.to_string())?;
+            .map_err(|err| crate::i18n::show_failed(&err.to_string()))?;
+    let count = unsafe { shell_windows.Count() }.map_err(|err| crate::i18n::show_failed(&err.to_string()))?;
     let foreground = unsafe { GetForegroundWindow() };
     let mut selected = false;
     let mut raise: Option<HWND> = None;
@@ -195,10 +195,10 @@ fn reveal_with_shell(file: &Path) -> Result<(), String> {
     let mut pidl = std::ptr::null_mut();
     unsafe {
         SHParseDisplayName(PCWSTR(wide.as_ptr()), None::<&IBindCtx>, &mut pidl, 0, None)
-            .map_err(|err| err.to_string())?;
+            .map_err(|err| crate::i18n::show_failed(&err.to_string()))?;
     }
     if pidl.is_null() {
-        return Err("проводник не понял путь".to_owned());
+        return Err(crate::i18n::shell_path());
     }
     let child = unsafe { ILClone(ILFindLastID(pidl)) };
     let removed = unsafe { ILRemoveLastID(Some(pidl)) };
@@ -207,13 +207,13 @@ fn reveal_with_shell(file: &Path) -> Result<(), String> {
         let opened = unsafe { SHOpenFolderAndSelectItems(pidl, Some(&items), 0) };
         unsafe { ILFree(Some(child)) };
         unsafe { ILFree(Some(pidl)) };
-        return opened.map_err(|err| err.to_string());
+        return opened.map_err(|err| crate::i18n::show_failed(&err.to_string()));
     }
     if !child.is_null() {
         unsafe { ILFree(Some(child)) };
     }
     unsafe { ILFree(Some(pidl)) };
-    Err("не получилось показать файл".to_owned())
+    Err(crate::i18n::show_file())
 }
 
 fn reveal_with_explorer(file: &Path) -> Result<(), String> {
@@ -223,7 +223,7 @@ fn reveal_with_explorer(file: &Path) -> Result<(), String> {
         .arg(arg)
         .spawn()
         .map(|_| ())
-        .map_err(|err| format!("не открыть проводник: {err}"))
+        .map_err(|err| crate::i18n::open_explorer(&err.to_string()))
 }
 
 fn variant_i4(value: i32) -> VARIANT {
