@@ -1,0 +1,24 @@
+[[permission]]
+identifier = "allow-settings"
+description = "Прочитать настройки"
+commands.allow = ["settings"]
+
+[[permission]]
+identifier = "allow-save-settings"
+description = "Сохранить настройки и меню проводника"
+commands.allow = ["save_settings"]
+
+[[permission]]
+identifier = "allow-open-github"
+description = "Открыть страницу проекта"
+commands.allow = ["open_github"]
+
+[[permission]]
+identifier = "allow-check-update"
+description = "Проверить, есть ли новая версия"
+commands.allow = ["check_update"]
+
+[[permission]]
+identifier = "allow-install-update"
+description = "Скачать и заменить программу"
+commands.allow = ["install_update"]

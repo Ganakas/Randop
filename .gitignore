@@ -1,0 +1,16 @@
+/target
+/Cargo.lock
+/.cargo
+/src-tauri/target
+/src-tauri/gen
+/node_modules
+/dist
+/Randop.exe
+*.exe.old
+*.exe.new
+*.exe.bad
+*.exe.updated
+.env
+.env.*
+*.pem
+*.key

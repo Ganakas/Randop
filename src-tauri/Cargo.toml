@@ -1,0 +1,36 @@
+[package]
+name = "randop"
+version = "0.1.0"
+edition = "2024"
+description = "Случайный файл из папки через меню проводника"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+dirs = "7"
+rand = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Ole",
+    "Win32_System_Variant",
+    "Win32_UI_Shell",
+    "Win32_Networking_WinHttp",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_WindowsAndMessaging",
+] }
+winreg = "0.56"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+opt-level = "s"
+strip = true
