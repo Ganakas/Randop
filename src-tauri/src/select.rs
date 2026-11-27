@@ -10,7 +10,7 @@ use windows::Win32::System::Com::{
 use windows::Win32::System::Variant::{VARIANT, VT_I4};
 use windows::Win32::UI::Shell::Common::{ITEMIDLIST, STRRET};
 use windows::Win32::UI::Shell::{
-    IFolderView, ILClone, ILFindLastID, ILFree, ILRemoveLastID, IPersistFolder2, IShellBrowser,
+    IFolderView, ILClone, ILFindLastID, ILFree, IPersistFolder2, IShellBrowser,
     IShellFolder, IShellView, IShellWindows, SHGDN_FORPARSING, SHGDN_INFOLDER, SHGDNF,
     SHGetNameFromIDList, SHOpenFolderAndSelectItems, SHParseDisplayName, SID_STopLevelBrowser,
     SIGDN_FILESYSPATH, SVGIO_ALLVIEW, SVSI_DESELECTOTHERS, SVSI_ENSUREVISIBLE, SVSI_FOCUSED,
@@ -31,14 +31,29 @@ pub fn highlight_many(files: &[std::path::PathBuf]) -> Result<(), String> {
     if files.is_empty() {
         return Ok(());
     }
-    match select_in_open_windows(files) {
-        Ok(true) => return Ok(()),
-        Ok(false) | Err(_) => {}
+    let hit = select_in_open_windows(files).unwrap_or_default();
+    let mut missed: Vec<std::path::PathBuf> = files
+        .iter()
+        .filter(|file| !hit.iter().any(|got| same_path(got, file)))
+        .cloned()
+        .collect();
+    if missed.is_empty() {
+        return Ok(());
     }
-    reveal(&files[0])
+    missed.sort_by(|left, right| left.parent().cmp(&right.parent()));
+    let mut start = 0;
+    while start < missed.len() {
+        let mut end = start + 1;
+        while end < missed.len() && missed[end].parent() == missed[start].parent() {
+            end += 1;
+        }
+        reveal_group(&missed[start..end])?;
+        start = end;
+    }
+    Ok(())
 }
 
-fn select_in_open_windows(files: &[std::path::PathBuf]) -> Result<bool, String> {
+fn select_in_open_windows(files: &[std::path::PathBuf]) -> Result<Vec<std::path::PathBuf>, String> {
     let init = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
     if init.is_err() {
         return Err(format!("com: {init}"));
@@ -49,7 +64,7 @@ fn select_in_open_windows(files: &[std::path::PathBuf]) -> Result<bool, String> 
             .map_err(|err| crate::i18n::show_failed(&err.to_string()))?;
     let count = unsafe { shell_windows.Count() }.map_err(|err| crate::i18n::show_failed(&err.to_string()))?;
     let foreground = unsafe { GetForegroundWindow() };
-    let mut selected = false;
+    let mut hit = Vec::new();
     let mut raise: Option<HWND> = None;
 
     for index in 0..count {
@@ -59,32 +74,28 @@ fn select_in_open_windows(files: &[std::path::PathBuf]) -> Result<bool, String> 
         let Some(view_folder) = folder_of_view(&view.folder) else {
             continue;
         };
-        let mut indices = Vec::new();
-        for file in files {
-            let Some(parent) = file.parent() else {
-                continue;
-            };
-            if !same_path(&view_folder, parent) {
-                continue;
-            }
-            if let Some(item) = find_item(&view.view, &view.folder, file) {
-                indices.push(item);
-            }
-        }
-        if indices.is_empty() {
+        let here: Vec<&std::path::PathBuf> = files
+            .iter()
+            .filter(|file| {
+                file.parent()
+                    .is_some_and(|parent| same_path(&view_folder, parent))
+            })
+            .collect();
+        let found = find_items(&view.view, &view.folder, &here);
+        if found.is_empty() {
             continue;
         }
         let mut picked = false;
-        for (nth, item) in indices.iter().enumerate() {
+        for (nth, (item, file)) in found.iter().enumerate() {
             let flags = if nth == 0 { SELECT_FLAGS } else { ADD_FLAGS };
             if unsafe { view.view.SelectItem(*item, flags) }.is_ok() {
+                hit.push((*file).clone());
                 picked = true;
             }
         }
         if !picked {
             continue;
         }
-        selected = true;
         let root = unsafe { GetAncestor(view.hwnd, GA_ROOT) };
         let foreground_root = unsafe { GetAncestor(foreground, GA_ROOT) };
         if root == foreground || root == foreground_root || raise.is_none() {
@@ -92,14 +103,12 @@ fn select_in_open_windows(files: &[std::path::PathBuf]) -> Result<bool, String> 
         }
     }
 
-    if selected {
-        if let Some(hwnd) = raise {
-            unsafe {
-                let _ = SetForegroundWindow(hwnd);
-            }
+    if let Some(hwnd) = raise {
+        unsafe {
+            let _ = SetForegroundWindow(hwnd);
         }
     }
-    Ok(selected)
+    Ok(hit)
 }
 
 struct ExplorerView {
@@ -135,9 +144,20 @@ fn folder_of_view(folder: &IShellFolder) -> Option<std::path::PathBuf> {
     Some(std::path::PathBuf::from(text?))
 }
 
-fn find_item(view: &IFolderView, folder: &IShellFolder, file: &Path) -> Option<i32> {
-    let count = unsafe { view.ItemCount(SVGIO_ALLVIEW).ok()? };
+fn find_items<'a>(
+    view: &IFolderView,
+    folder: &IShellFolder,
+    files: &[&'a std::path::PathBuf],
+) -> Vec<(i32, &'a std::path::PathBuf)> {
+    let Ok(count) = (unsafe { view.ItemCount(SVGIO_ALLVIEW) }) else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    let mut seen = vec![false; files.len()];
     for index in 0..count {
+        if seen.iter().all(|flag| *flag) {
+            break;
+        }
         let Ok(child) = (unsafe { view.Item(index) }) else {
             continue;
         };
@@ -146,11 +166,17 @@ fn find_item(view: &IFolderView, folder: &IShellFolder, file: &Path) -> Option<i
         }
         let name = item_name(folder, child);
         unsafe { ILFree(Some(child)) };
-        if name.is_some_and(|name| names_match(&name, file)) {
-            return Some(index);
+        let Some(name) = name else {
+            continue;
+        };
+        for (nth, file) in files.iter().enumerate() {
+            if !seen[nth] && names_match(&name, file) {
+                seen[nth] = true;
+                found.push((index, *file));
+            }
         }
     }
-    None
+    found
 }
 
 fn item_name(folder: &IShellFolder, child: *mut ITEMIDLIST) -> Option<String> {
@@ -179,41 +205,67 @@ fn names_match(shell_name: &str, file: &Path) -> bool {
     got_name == wanted || got.to_lowercase() == wanted
 }
 
-fn reveal(file: &Path) -> Result<(), String> {
-    let init = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
-    if init.is_err() {
-        return reveal_with_explorer(file);
-    }
-    if reveal_with_shell(file).is_ok() {
+fn reveal_group(files: &[std::path::PathBuf]) -> Result<(), String> {
+    if files.is_empty() {
         return Ok(());
     }
-    reveal_with_explorer(file)
+    let init = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED) };
+    if init.is_ok() && reveal_with_shell(files).is_ok() {
+        return Ok(());
+    }
+    reveal_with_explorer(&files[0])
 }
 
-fn reveal_with_shell(file: &Path) -> Result<(), String> {
-    let wide = wide_null(file.as_os_str());
+fn reveal_with_shell(files: &[std::path::PathBuf]) -> Result<(), String> {
+    let parent = files[0].parent().ok_or_else(crate::i18n::shell_path)?;
+    let folder = parse_pidl(parent)?;
+    let mut children = Vec::with_capacity(files.len());
+    for file in files {
+        let full = match parse_pidl(file) {
+            Ok(full) => full,
+            Err(err) => {
+                free_pidls(&children);
+                unsafe { ILFree(Some(folder)) };
+                return Err(err);
+            }
+        };
+        let child = unsafe { ILClone(ILFindLastID(full)) };
+        unsafe { ILFree(Some(full)) };
+        if child.is_null() {
+            free_pidls(&children);
+            unsafe { ILFree(Some(folder)) };
+            return Err(crate::i18n::show_file());
+        }
+        children.push(child);
+    }
+    let items: Vec<*const ITEMIDLIST> = children
+        .iter()
+        .map(|child| *child as *const ITEMIDLIST)
+        .collect();
+    let opened = unsafe { SHOpenFolderAndSelectItems(folder, Some(&items), 0) };
+    free_pidls(&children);
+    unsafe { ILFree(Some(folder)) };
+    opened.map_err(|err| crate::i18n::show_failed(&err.to_string()))
+}
+
+fn parse_pidl(path: &Path) -> Result<*mut ITEMIDLIST, String> {
+    let wide = wide_null(path.as_os_str());
     let mut pidl = std::ptr::null_mut();
     unsafe {
         SHParseDisplayName(PCWSTR(wide.as_ptr()), None::<&IBindCtx>, &mut pidl, 0, None)
             .map_err(|err| crate::i18n::show_failed(&err.to_string()))?;
     }
     if pidl.is_null() {
-        return Err(crate::i18n::shell_path());
+        Err(crate::i18n::shell_path())
+    } else {
+        Ok(pidl)
     }
-    let child = unsafe { ILClone(ILFindLastID(pidl)) };
-    let removed = unsafe { ILRemoveLastID(Some(pidl)) };
-    if removed.as_bool() && !child.is_null() {
-        let items = [child as *const ITEMIDLIST];
-        let opened = unsafe { SHOpenFolderAndSelectItems(pidl, Some(&items), 0) };
-        unsafe { ILFree(Some(child)) };
-        unsafe { ILFree(Some(pidl)) };
-        return opened.map_err(|err| crate::i18n::show_failed(&err.to_string()));
+}
+
+fn free_pidls(pidls: &[*mut ITEMIDLIST]) {
+    for pidl in pidls {
+        unsafe { ILFree(Some(*pidl)) };
     }
-    if !child.is_null() {
-        unsafe { ILFree(Some(child)) };
-    }
-    unsafe { ILFree(Some(pidl)) };
-    Err(crate::i18n::show_file())
 }
 
 fn reveal_with_explorer(file: &Path) -> Result<(), String> {

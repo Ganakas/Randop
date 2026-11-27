@@ -2,7 +2,7 @@
 name = "randop"
 version = "0.1.0"
 edition = "2024"
-description = "Случайный файл из папки через меню проводника"
+description = "Pick a random file from the Explorer context menu"
 publish = false
 
 [build-dependencies]

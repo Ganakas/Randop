@@ -1,12 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 #[cfg(not(windows))]
-compile_error!("Randop работает только на Windows");
+compile_error!("Randop only runs on Windows");
 
 mod config;
 mod i18n;
-#[allow(dead_code)]
-mod icon_raster;
 mod launch;
 mod notify;
 mod registry;

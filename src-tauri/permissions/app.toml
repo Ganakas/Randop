@@ -1,29 +1,29 @@
 [[permission]]
 identifier = "allow-settings"
-description = "Прочитать настройки"
+description = "Read the settings"
 commands.allow = ["settings"]
 
 [[permission]]
 identifier = "allow-save-settings"
-description = "Сохранить настройки и меню проводника"
+description = "Save the settings and the Explorer menu"
 commands.allow = ["save_settings"]
 
 [[permission]]
 identifier = "allow-set-language"
-description = "Сменить язык окна и меню проводника"
+description = "Change the language of the window and the Explorer menu"
 commands.allow = ["set_language"]
 
 [[permission]]
 identifier = "allow-open-github"
-description = "Открыть страницу проекта"
+description = "Open the project page"
 commands.allow = ["open_github"]
 
 [[permission]]
 identifier = "allow-check-update"
-description = "Проверить, есть ли новая версия"
+description = "Check whether a newer version exists"
 commands.allow = ["check_update"]
 
 [[permission]]
 identifier = "allow-install-update"
-description = "Скачать и заменить программу"
+description = "Download and replace the program"
 commands.allow = ["install_update"]

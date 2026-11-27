@@ -46,11 +46,6 @@ pub fn collect(root: &Path, config: &Config) -> Result<Vec<PathBuf>, String> {
     }
     let mut items = Vec::new();
     walk(root, config, 0, &mut items)?;
-    items.sort_by(|left, right| {
-        left.to_string_lossy()
-            .to_lowercase()
-            .cmp(&right.to_string_lossy().to_lowercase())
-    });
     Ok(items)
 }
 
