@@ -11,3 +11,7 @@ The current build is [Randop.exe](https://github.com/Ganakas/Randop/releases/lat
 ## Build
 
 Rust and Node.js are required. Run `build.bat`. It writes `Randop.exe` next to itself. The first build compiles dependencies and takes a few minutes.
+
+## License
+
+[MIT](LICENSE)
